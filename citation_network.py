@@ -6,7 +6,7 @@ import argparse
 import traceback
 from pathlib import Path
 
-def build_edge_list(file_list):
+def build_edge_list(file_list, verbose=True):
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -15,11 +15,12 @@ def build_edge_list(file_list):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+    if verbose:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
 
     article_pmid = re.compile(r'<front>.*<article-id pub-id-type="pmid">(\d+)</article-id>.*</front>')
     refs_list = re.compile(r'<back>.*<ref-list>(.*)</ref-list>.*</back>')
@@ -30,7 +31,6 @@ def build_edge_list(file_list):
 
     for xml_file in file_list:
         try:
-            #if xml_file.split(".")[-1] == "nxml":
             with open(xml_file, "r") as handle:
                 article = handle.readlines()
 
@@ -53,6 +53,8 @@ def build_edge_list(file_list):
             logger.error(repr(e))
             logger.critical(trace)
 
+    logger.info(f"Edge list built - {len(edges)} edges")
+
     return edges
 
 def write_edge_list(edge_list, out_path="edge_list.csv", delim=","):
@@ -67,6 +69,8 @@ def main():
                         required=True, type=str)
     parser.add_argument("-o", "--output", help="Output file path to write edge list to, stdout if no path provided")
     parser.add_argument("-n", "--number", help="The number of samples to generate", type=int)
+    parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. Warning: exceptions will not be printed to console",
+                        action="store_true")
     args = parser.parse_args()
 
     # Set up logging
@@ -86,8 +90,11 @@ def main():
     xmls_to_parse = []
     for xml in xmls:
         xmls_to_parse.append(os.path.join(xml_containing_dir, xml))
-        
-    edge_list = build_edge_list(xmls_to_parse)
+    
+    if args.quiet:
+        edge_list = build_edge_list(xmls_to_parse, verbose=False)
+    else:
+        edge_list = build_edge_list(xmls_to_parse)
 
     if args.output:
         write_edge_list(edge_list, args.output)
