@@ -6,7 +6,7 @@ import argparse
 import traceback
 from pathlib import Path
 
-def build_edge_list(file_list, verbose=True):
+def edge_generator(file_list, verbose=True):
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -22,13 +22,14 @@ def build_edge_list(file_list, verbose=True):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    #pmc_articleset = re.compile(r'<!DOCTYPE pmc-articleset')
     article_pmid = re.compile(r'<front>[\s\S]*<article-id pub-id-type="pmid">(\d+)</article-id>[\s\S]*</front>')
     article_refs_list = re.compile(r'<back>[\s\S]*<ref-list([\s\S]*)</ref-list>[\s\S]*</back>')
     article_ref_pmid = re.compile(r'<pub-id pub-id-type="pmid">(\d+)</pub-id>')
     
-    edges = []
-    logger.info("Starting edge list build")
+    logger.info("Starting edge list generator")
+    
+    edge_count = 0
+    doc_count = 0
 
     for xml_file in file_list:
         try:
@@ -37,43 +38,53 @@ def build_edge_list(file_list, verbose=True):
 
             article = "".join(article)
             
-            #if not pmc_articleset.search(article):
             article_id_match = article_pmid.search(article)
             refs_match = article_refs_list.search(article)
 
             if article_id_match and refs_match:
                 article_id = article_id_match.group(1)
                 refs = refs_match.group(1)
-            
                 refs = refs.split("<ref")
+                doc_count += 1
+
                 for ref in refs:
                     ref_match = article_ref_pmid.search(ref)
                     if ref_match:
-                        edges.append((article_id, ref_match.group(1)))
-            #else:
+                        edge_count += 1
+                        yield (article_id, ref_match.group(1))
                 
         except Exception as e:
             trace = traceback.format_exc()
             logger.error(repr(e))
             logger.critical(trace)
 
-    logger.info(f"Edge list built - {len(edges)} edges")
+    logger.info(f"Generated {edge_count} edges from {doc_count} documents")
 
-    return edges
+def build_edge_list(file_list, verbose=True):
+    gen = edge_generator(file_list, verbose)
 
-def write_edge_list(edge_list, out_path="edge_list.csv", delim=","):
+    edge_list = []
+    for edge in gen:
+        edge_list.append(edge)
+
+    return edge_list
+
+def write_edge_list(file_list, out_path="edge_list.csv", delim=",", verbose=True):
+    gen = edge_generator(file_list, verbose)
     with open(out_path, "w") as out:
-        for edge in edge_list:
+        for edge in gen:
             out.write("".join([edge[0], delim, edge[1], "\n"]))
 
 def main():
     # Get command line args
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", help="A directory, can be relative to cwd, containing " \
-                    "XMLs to build an edge list from", required=True, type=str)
+                    "XMLs to build an edge list from. Does not recursively search child directories, " \
+                    "all XMLs should be at the top level of the directory", 
+                    required=True, type=str)
     parser.add_argument("-o", "--output", help="Output file path to write edge list to, stdout " \
                     "if no path provided")
-    parser.add_argument("-n", "--number", help="The number of samples to generate", type=int)
+    parser.add_argument("-n", "--number", help="The number of documents to parse", type=int)
     parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
                     "Warning: exceptions will not be printed to console", action="store_true")
     args = parser.parse_args()
@@ -92,15 +103,15 @@ def main():
     # Check to make sure paths are files and not dirs
     xmls_to_parse = [path for path in xmls_to_parse if os.path.isfile(path)]
 
-    if args.quiet:
-        edge_list = build_edge_list(xmls_to_parse, verbose=False)
-    else:
-        edge_list = build_edge_list(xmls_to_parse)
-
     if args.output:
-        write_edge_list(edge_list, args.output)
+        if args.quiet:
+            write_edge_list(xmls_to_parse, args.output, verbose=False)
+        else:
+            write_edge_list(xmls_to_parse, args.output, verbose=True)
     else:
-        for edge in edge_list:
+        # Verbose set to false here, as this is intended primarily for piping output
+        gen = edge_generator(xmls_to_parse, verbose=False)
+        for edge in gen:
             sys.stdout.write("".join([edge[0], ",", edge[1], "\n"]))
 
 if __name__ == "__main__":
