@@ -7,6 +7,18 @@ import traceback
 from pathlib import Path
 
 def edge_generator(file_list, verbose=True):
+    ''' Generates the edges from PMC full-text XML files. These edges
+        comprise the citation network. Tested on XMLs retrieved from the 
+        Pubmed API as well as the bulk files from the Pubmed FTP site.
+    params
+        file_list - A list of XMLs to parse
+        verbose - Boolean, print logging and exceptions to console
+    returns
+        yields single directed edges as tuples in the format
+        (article_PMID, reference_PMID)
+        where the article with PMID article_PMID cites the article
+        with PMID reference_PMID
+    '''
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -27,7 +39,7 @@ def edge_generator(file_list, verbose=True):
     article_ref_pmid = re.compile(r'<pub-id pub-id-type="pmid">(\d+)</pub-id>')
     
     logger.info("Starting edge list generator")
-    
+
     edge_count = 0
     doc_count = 0
 
@@ -61,6 +73,16 @@ def edge_generator(file_list, verbose=True):
     logger.info(f"Generated {edge_count} edges from {doc_count} documents")
 
 def build_edge_list(file_list, verbose=True):
+    ''' A wrapper for the generator in cases where a list is needed
+    params
+        file_list - A list of XMLs to parse
+        verbose - Boolean, print logging and exceptions to console
+    returns
+        returns a list of directed edges as tuples in the format
+        (article_PMID, reference_PMID)
+        where the article with PMID article_PMID cites the article
+        with PMID reference_PMID
+    '''
     gen = edge_generator(file_list, verbose)
 
     edge_list = []
@@ -69,7 +91,15 @@ def build_edge_list(file_list, verbose=True):
 
     return edge_list
 
-def write_edge_list(file_list, out_path="edge_list.csv", delim=",", verbose=True):
+def write_edge_list(file_list, out_path, delim=",", verbose=True):
+    ''' A wrapper for the generator that writes to an output file
+    params
+        file_list - A list of XMLs to parse
+        out_path - Output path to write edge list to
+        delim - delimiter to separate nodes for each edge
+        verbose - Boolean, print logging and exceptions to console
+    '''
+
     gen = edge_generator(file_list, verbose)
     with open(out_path, "w") as out:
         for edge in gen:
