@@ -199,7 +199,7 @@ def main():
                     required=True, type=str)
     parser.add_argument("-i", "--input", help="A directory containing Pubmed citation XMLs",
                     required=True, type=str)
-    #parser.add_argument("-o", "--output", help="Output file to write data in a tab-delimited format")
+    parser.add_argument("-o", "--output", help="Output file to write data in a comma-delimited format")
     #parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
     #                "Warning: exceptions will not be printed to console", action="store_true")
     args = parser.parse_args()
@@ -277,13 +277,14 @@ def main():
     print("Computing semantic similarities...")
     start_time = time.perf_counter()
 
+    # TODO: use os.cpu_count() here to figure out how to distribute worker roles
     num_workers = 3
     num_writers = 2
     write_queue = Queue(maxsize=100)
     work_queue = Queue(maxsize=100)
 
     writers = [Process(target=output_writer, args=(write_queue, 
-                f"./data/semantic_similarities_rev1.{num}.csv")) for num in range(num_writers)]
+                f"{args.output}.{num}.csv")) for num in range(num_writers)]
 
     for writer in writers:
         writer.daemon = True
@@ -316,10 +317,10 @@ def main():
     logger.info(f"Semantic similarities calculated in {elapsed_time} seconds")
 
     # Cleanup
-    cat = "cat ./data/semantic_similarities_rev1.*.csv > ./data/semantic_similarities_rev1.csv"
+    cat = f"cat {args.output}.*.csv > {args.output}.csv"
     with Popen(cat, stdout=PIPE, stderr=PIPE, shell=True) as proc:
         results, errs = proc.communicate()
-    with Popen("rm ./data/semantic_similarities_rev1.*.csv", stdout=PIPE, 
+    with Popen(f"rm {args.output}.*.csv", stdout=PIPE, 
                 stderr=PIPE, shell=True) as proc:
         results, errs = proc.communicate()
 
