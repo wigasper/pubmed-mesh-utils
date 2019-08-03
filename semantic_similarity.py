@@ -6,6 +6,7 @@ import math
 import json
 import time
 import logging
+import argparse
 import traceback
 from multiprocessing import Process, Queue
 from copy import deepcopy
@@ -13,7 +14,7 @@ from itertools import combinations
 from subprocess import Popen, PIPE
 
 import numpy as np
-from tqdm import tqdm
+import parse_mesh
 
 # Gets a list of children for a term. Because we we don't actually have a graph
 # to traverse, it is done by searching according to position on the graph
@@ -87,7 +88,7 @@ def count_mesh_terms(doc_list, uids, logger, load_flag=True, save_flag=False):
 
         term_counts = {uid:0 for uid in uids}
         # Count MeSH terms
-        for doc in tqdm(doc_list):
+        for doc in doc_list:
             try:
                 with open("./pubmed_bulk/{}".format(doc), "r") as handle:
                     start_time = time.perf_counter()
@@ -149,7 +150,7 @@ def get_term_freqs(term_counts, term_trees, uids, logger, load_flag=True, save_f
                         break
 
         print("Computing term frequencies...")
-        for term in tqdm(sorted_terms):
+        for term in sorted_terms:
             term_freqs[term] = freq(term, term_counts, term_freqs, term_trees)
         
         # Get elapsed time and truncate for log
@@ -199,6 +200,15 @@ def mp_worker(work_queue, write_queue, id_num, sws, svs, term_trees, term_trees_
         logger.critical(trace)
 
 def main():
+    # Get command line args
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--input", help="Pubmed's MeSH descriptor data in XML format", 
+                    required=True, type=str)
+    parser.add_argument("-o", "--output", help="Output file to write data in a tab-delimited format")
+    parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
+                    "Warning: exceptions will not be printed to console", action="store_true")
+    args = parser.parse_args()
+
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
