@@ -14,7 +14,7 @@ from itertools import combinations
 from subprocess import Popen, PIPE
 
 import numpy as np
-import parse_mesh
+from parse_mesh import parse_mesh
 
 # Gets a list of children for a term. Because we we don't actually have a graph
 # to traverse, it is done by searching according to position on the graph
@@ -202,17 +202,17 @@ def mp_worker(work_queue, write_queue, id_num, sws, svs, term_trees, term_trees_
 def main():
     # Get command line args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input", help="Pubmed's MeSH descriptor data in XML format", 
+    parser.add_argument("-m", "--mesh", help="Pubmed's MeSH descriptor data in XML format", 
                     required=True, type=str)
-    parser.add_argument("-o", "--output", help="Output file to write data in a tab-delimited format")
-    parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
-                    "Warning: exceptions will not be printed to console", action="store_true")
+    #parser.add_argument("-o", "--output", help="Output file to write data in a tab-delimited format")
+    #parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
+    #                "Warning: exceptions will not be printed to console", action="store_true")
     args = parser.parse_args()
 
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    handler = logging.FileHandler("./logs/compute_semantic_similarity.log")
+    handler = logging.FileHandler("compute_semantic_similarity.log")
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -221,12 +221,7 @@ def main():
     names = []
     trees = []
 
-    with open("./data/mesh_data.tab", "r") as handle:
-        for line in handle:
-            line = line.strip("\n").split("\t")
-            uids.append(line[0])
-            names.append(line[1])
-            trees.append(line[4].split(","))
+    uids, names, trees = parse_mesh(args.mesh)
 
     docs = os.listdir("./pubmed_bulk")
 
