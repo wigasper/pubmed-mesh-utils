@@ -75,94 +75,87 @@ def semantic_similarity(uid1, uid2, sws, svs, term_trees, term_trees_rev):
     return 0 if num is np.NaN or denom is 0 else num / denom
 
 # Get MeSH term counts
-def count_mesh_terms(doc_list, uids, logger, load_flag=True, save_flag=False):
-    if load_flag:
-        with open("./data/pm_bulk_term_counts.json", "r") as handle:
-            term_counts = json.load(handle)
-    else:
-        print("Starting MeSH term counting...")
-        # Compile regexes for counting MeSH terms
-        mesh_list_start = re.compile(r"\s*<MeshHeadingList>")
-        mesh_list_stop = re.compile(r"\s*</MeshHeadingList>")
-        mesh_term_id = re.compile(r'\s*<DescriptorName UI="(D\d+)".*>')
+def count_mesh_terms(doc_list, uids, logger):
+    print("Starting MeSH term counting...")
+    # Compile regexes for counting MeSH terms
+    mesh_list_start = re.compile(r"\s*<MeshHeadingList>")
+    mesh_list_stop = re.compile(r"\s*</MeshHeadingList>")
+    mesh_term_id = re.compile(r'\s*<DescriptorName UI="(D\d+)".*>')
 
-        term_counts = {uid:0 for uid in uids}
-        # Count MeSH terms
-        for doc in doc_list:
-            try:
-                with open("./pubmed_bulk/{}".format(doc), "r") as handle:
-                    start_time = time.perf_counter()
+    term_counts = {uid:0 for uid in uids}
+    # Count MeSH terms
+    for doc in doc_list:
+        try:
+            with open("./pubmed_bulk/{}".format(doc), "r") as handle:
+                start_time = time.perf_counter()
 
+                line = handle.readline()
+                while line:
+                    if mesh_list_start.search(line):
+                        while not mesh_list_stop.search(line):
+                            if mesh_term_id.search(line):
+                                term_id = mesh_term_id.search(line).group(1)
+                                term_counts[term_id] += 1
+                            line = handle.readline()
                     line = handle.readline()
-                    while line:
-                        if mesh_list_start.search(line):
-                            while not mesh_list_stop.search(line):
-                                if mesh_term_id.search(line):
-                                    term_id = mesh_term_id.search(line).group(1)
-                                    term_counts[term_id] += 1
-                                line = handle.readline()
-                        line = handle.readline()
 
-                    # Get elapsed time and truncate for log
-                    elapsed_time = int((time.perf_counter() - start_time) * 10) / 10.0
-                    logger.info(f"{doc} MeSH term counts completed in {elapsed_time} seconds")
-            except Exception as e:
-                trace = traceback.format_exc()
-                logger.error(repr(e))
-                logger.critical(trace)
+                # Get elapsed time and truncate for log
+                elapsed_time = int((time.perf_counter() - start_time) * 10) / 10.0
+                logger.info(f"{doc} MeSH term counts completed in {elapsed_time} seconds")
+        except Exception as e:
+            trace = traceback.format_exc()
+            logger.error(repr(e))
+            logger.critical(trace)
+    """
     if save_flag:
         with open("./data/pm_bulk_term_counts.json", "w") as out:
             json.dump(term_counts, out)
+    """
     return term_counts
 
 # Get term frequencies by counting (according to Song et al.'s recursive definition)
 # or by loading
-def get_term_freqs(term_counts, term_trees, uids, logger, load_flag=True, save_flag=False):
+def get_term_freqs(term_counts, term_trees, uids, logger):
     term_freqs = {uid:-1 for uid in uids}
     
-    if load_flag:
-        with open("./data/mesh_term_freq_vals.csv", "r") as handle:
-            for line in handle:
-    	        line = line.strip("\n").split(",")
-    	        term_freqs[line[0]] = int(line[1])
-    else:
-        # Get term frequencies (counts) recursively as described by
-        # Song et al
-        start_time = time.perf_counter()
+    # Get term frequencies (counts) recursively as described by
+    # Song et al
+    start_time = time.perf_counter()
 
-        # Sort terms so that we hit leaf nodes first and work up from there
-        # - this takes a little longer upfront but reduces computation
-        # time greatly by limiting the number of recursive calls
-        
-        # Get the max depth
-        max_depth = 0
+    # Sort terms so that we hit leaf nodes first and work up from there
+    # - this takes a little longer upfront but reduces computation
+    # time greatly by limiting the number of recursive calls
+    
+    # Get the max depth
+    max_depth = 0
+    for term in term_trees:
+        for tree in term_trees[term]:
+            if len(tree.split(".")) > max_depth:
+                max_depth = len(tree.split("."))
+    
+    sorted_terms = []
+    for depth in range(max_depth, 0, -1):
         for term in term_trees:
             for tree in term_trees[term]:
-                if len(tree.split(".")) > max_depth:
-                    max_depth = len(tree.split("."))
-        
-        sorted_terms = []
-        for depth in range(max_depth, 0, -1):
-            for term in term_trees:
-                for tree in term_trees[term]:
-                    if len(tree.split(".")) == depth and term not in sorted_terms:
-                        sorted_terms.append(term)
-                        break
+                if len(tree.split(".")) == depth and term not in sorted_terms:
+                    sorted_terms.append(term)
+                    break
 
-        print("Computing term frequencies...")
-        for term in sorted_terms:
-            term_freqs[term] = freq(term, term_counts, term_freqs, term_trees)
-        
-        # Get elapsed time and truncate for log
-        elapsed_time = int((time.perf_counter() - start_time) * 10) / 10.0
-        logger.info(f"Term freqs calculated in {elapsed_time} seconds")
+    print("Computing term frequencies...")
+    for term in sorted_terms:
+        term_freqs[term] = freq(term, term_counts, term_freqs, term_trees)
+    
+    # Get elapsed time and truncate for log
+    elapsed_time = int((time.perf_counter() - start_time) * 10) / 10.0
+    logger.info(f"Term freqs calculated in {elapsed_time} seconds")
 
+    """
     if save_flag:
         with open("./data/mesh_term_freq_vals.csv", "w") as out:
             for term in term_freqs:
                 out.write(",".join([term, str(term_freqs[term])]))
                 out.write("\n")
-    
+    """
     return term_freqs
 
 # A function for multiprocessing, pulls from the queue and writes
@@ -204,6 +197,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--mesh", help="Pubmed's MeSH descriptor data in XML format", 
                     required=True, type=str)
+    parser.add_argument("-i", "--input", help="A directory containing Pubmed citation XMLs",
+                    required=True, type=str)
     #parser.add_argument("-o", "--output", help="Output file to write data in a tab-delimited format")
     #parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
     #                "Warning: exceptions will not be printed to console", action="store_true")
@@ -223,14 +218,14 @@ def main():
 
     uids, names, trees = parse_mesh(args.mesh)
 
-    docs = os.listdir("./pubmed_bulk")
+    docs = os.listdir(args.input)
 
     # Create term_trees dict and reverse for quick and easy lookup later
     term_trees = {uids[idx]:trees[idx] for idx in range(len(uids))}
     term_trees_rev = {tree:uids[idx] for idx in range(len(uids)) for tree in trees[idx]}
 
     # Get term counts. If recounting terms change the flags
-    term_counts = count_mesh_terms(docs, uids, logger, load_flag=True, save_flag=False)
+    term_counts = count_mesh_terms(docs, uids, logger)
 
     # Computing aggregate information content is done in a step-by-step
     # process here to make it easy to follow along. I used Song, Li, Srimani,
@@ -238,7 +233,7 @@ def main():
     # Aggregate Information Content" as a guide
     
     # Get term counts. If recounting terms change the flags
-    term_freqs = get_term_freqs(term_counts, term_trees, uids, logger, load_flag=True, save_flag=False)
+    term_freqs = get_term_freqs(term_counts, term_trees, uids, logger)
 
     root_freq = sum(term_freqs.values())
                 
