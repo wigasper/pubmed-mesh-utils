@@ -6,7 +6,7 @@ These are tools I created for a project that used features generated from a biom
 ## Tools
 **citation_network.py** - This parses PMC full-text XML files and generates a directed edge list describing the relationships between nodes in the network. It is currently written to parse full-text XMLs from either the Pubmed API or the Pubmed FTP site - which have slightly different formats. It currently takes a directory path as input and will parse all files in the directory, additional input validation and input from stdin are planned for the future.
 
-Full-text articles in XML format that are part of PMC's open access subset can be obtained from [NCBI's FTP site](https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/) or by using the [NCBI API EFecth utility](https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.EFetch)
+Full-text articles in XML format that are part of PMC's open access subset can be obtained from [NCBI's FTP site](https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_bulk/) or by using the [NCBI API EFetch utility](https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.EFetch)
 
 citation_network.py can be used from the command line like so:
 ```
@@ -27,7 +27,7 @@ D000002	Temefos	D02.705.400.625.800,D02.705.539.345.800,D02.886.300.692.800
 ...
 ```
 
-**semantic_similarity.py** - Computes the semantic similarity of all MeSH terms by Song, Li, Srimani, Yu, and Wang's aggregate information content method detailed in the article [Measure the Semantic Similarity of GO Terms Using Aggregate Information Content](https://www.ncbi.nlm.nih.gov/pubmed/26356015). Requires the parse_mesh module, the MeSH vocabulary available from [NCBI's FTP site](ftp://nlmpubs.nlm.nih.gov/online/mesh/MESH_FILES/xmlmesh/), and documents containing Pubmed citations in XML format, available from [NCBI's FTP site](https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/) or by way of the [NCBI API EFecth utility](https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.EFetch). This is quite a time and memory consuming process - it computes the semantic similarity of all pair-combinations of all MeSH terms (currently 29,351) using a simple multiprocessing architecture. Currently intended to be used only from the command line. May be ported to Rust in the future.
+**semantic_similarity.py** - Computes the semantic similarity of all MeSH terms by Song, Li, Srimani, Yu, and Wang's aggregate information content method detailed in the article [Measure the Semantic Similarity of GO Terms Using Aggregate Information Content](https://www.ncbi.nlm.nih.gov/pubmed/26356015). Requires the parse_mesh module, the MeSH vocabulary available from [NCBI's FTP site](ftp://nlmpubs.nlm.nih.gov/online/mesh/MESH_FILES/xmlmesh/), and documents containing Pubmed citations in XML format, available from [NCBI's FTP site](https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/) or by way of the [NCBI API EFetch utility](https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.EFetch). This is quite a time and memory consuming process - it computes the semantic similarity of all pair-combinations of all MeSH terms (currently 29,351) using a simple multiprocessing architecture. Currently intended to be used only from the command line. May be ported to Rust in the future.
 
 It can be used from the command line like so:
 ```bash
