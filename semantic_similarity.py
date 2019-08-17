@@ -9,6 +9,7 @@ import logging
 import argparse
 import traceback
 from multiprocessing import Process, Queue
+from pathlib import Path
 from copy import deepcopy
 from itertools import combinations
 from subprocess import Popen, PIPE
@@ -286,14 +287,19 @@ def main():
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
+    
+    # Make filepaths absolute:
+    mesh_dir = Paths(args.mesh).resolve()
+    docs_temp = os.listdir(args.input)
+    docs_dir = Path(args.input).resolve()
+    docs = [os.path.join(docs_dir, doc) for doc in docs_temp]
 
+    # Get required MeSH data
     uids = []
     names = []
     trees = []
 
-    uids, names, trees = parse_mesh(args.mesh)
-
-    docs = os.listdir(args.input)
+    uids, names, trees = parse_mesh(mesh_dir)
 
     # Create term_trees dict and reverse for quick and easy lookup later
     term_trees = {uids[idx]:trees[idx] for idx in range(len(uids))}
