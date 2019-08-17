@@ -289,7 +289,7 @@ def main():
         logger.addHandler(handler)
     
     # Make filepaths absolute:
-    mesh_dir = Paths(args.mesh).resolve()
+    mesh_dir = Path(args.mesh).resolve()
     docs_temp = os.listdir(args.input)
     docs_dir = Path(args.input).resolve()
     docs = [os.path.join(docs_dir, doc) for doc in docs_temp]
