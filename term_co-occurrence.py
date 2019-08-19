@@ -9,7 +9,10 @@ import traceback
 from multiprocessing import Process, Queue
 
 import numpy as np
+# TODO: remove tqdm dependency
 from tqdm import tqdm
+
+# TODO: add docstrings
 
 def count_doc_terms(doc_list, term_subset, logger):
     doc_terms = {}
@@ -66,6 +69,8 @@ def count_doc_terms(doc_list, term_subset, logger):
 
     logger.info("Stopping doc/term counting")
 
+    # TODO: what to do here? probably can't have this all in memory
+    # maybe rm at cleanup
     with open("./data/pm_bulk_doc_term_counts.csv", "w") as out:
         for doc in doc_terms:
             out.write("".join([doc, ","]))
@@ -90,6 +95,7 @@ def td_matrix_gen(file_path, term_subset, docs_per_matrix):
             td_matrix.append(row)
 
 def matrix_builder(work_queue, add_queue, id_num):
+    # TODO: remove this logger, id_num arg
     # Set up logging - I do actually want a logger for each worker
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -123,7 +129,7 @@ def matrix_adder(add_queue, completed_queue, dim, docs_per_matrix, num, logger):
         if total_processed and total_processed % log_interval == 0:
             elapsed_time = int((time.perf_counter() - start_time) * 10) / 10.0
             time_per_it = elapsed_time / (docs_per_matrix * log_interval)
-            logger.info(f"Adder {num}: {total_processed * docs_per_matrix} docs added to matrix - last batch of "
+            logger.debug(f"Adder {num}: {total_processed * docs_per_matrix} docs added to matrix - last batch of "
                         f"{docs_per_matrix * log_interval} at a rate of {time_per_it} sec/it")
             start_time = time.perf_counter()
 
@@ -135,6 +141,7 @@ def matrix_adder(add_queue, completed_queue, dim, docs_per_matrix, num, logger):
         total_processed += 1
 
 def main():
+    # TODO: add args here for input, quiet mode
     # Get command line args
     parser = argparse.ArgumentParser()
     parser.add_argument("-rc", "--recount", help="recount terms for each doc", action="store_true")
@@ -149,12 +156,14 @@ def main():
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
+    # TODO: figure subset out, maybe have a function and get it as an arg
     # Load term subset to count for
     term_subset = []
     with open("./data/subset_terms_list", "r") as handle:
         for line in handle:
             term_subset.append(line.strip("\n"))
 
+    # TODO: remove this
     if args.recount:
         docs = os.listdir("./pubmed_bulk")
         count_doc_terms(docs, term_subset, logger)
@@ -165,6 +174,7 @@ def main():
 
     matrix_gen = td_matrix_gen("./data/pm_bulk_doc_term_counts.csv", term_subset, docs_per_matrix)
 
+    # TODO: add os cpu_count here to figure out num workers
     # Set up multiprocessing
     num_builders = 5
     num_adders = 2
@@ -221,11 +231,14 @@ def main():
 
     co_matrix = sum(co_matrices)
     
+    # TODO: remove this, right?
     np.save("./data/co-occurrence-matrix", co_matrix)
 
     # Compute probabilities to compare against
     term_counts = {}
 
+    # TODO: get this from parse_mesh, and double check logic here
+    # as this is pulling all UIDs and in everything else subset is used
     with open("./data/mesh_data.tab", "r") as handle:
         for line in handle:
             line = line.strip("\n").split("\t")
@@ -249,6 +262,7 @@ def main():
     # Create the expected co-occurrence probability matrix
     expected = np.zeros((len(term_subset), len(term_subset)))
 
+    # TODO: change to enumerate
     for row in range(expected.shape[0]):
         for col in range(expected.shape[1]):
             expected[row, col] = term_counts[term_subset[row]] * term_counts[term_subset[col]]
@@ -256,6 +270,7 @@ def main():
     # Fill 0s with np.NaN to avoid zero division errors later
     expected[expected == 0] = np.NaN
 
+    # TODO: change to enumerate
     # Get the total number of co-occurrences
     total_cooccurrs = 0
     for row in range(co_matrix.shape[0]):
@@ -279,6 +294,7 @@ def main():
     # Take the log of the array to get the log-likelihood ratio
     log_ratios = np.log(likelihood_ratios)
     
+    # TODO: change to enumerate
     with open("./data/term_co-occ_log_likelihoods.csv", "w") as out:
         for row in range(log_ratios.shape[0]):
             for col in range(row + 1, log_ratios.shape[1]):
