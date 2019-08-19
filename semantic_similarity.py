@@ -44,6 +44,7 @@ def get_children(uid, term_trees):
     
     return list(dict.fromkeys(children))
 
+
 def freq(uid, term_counts, term_freqs, term_trees):
     ''' Recursively computes the frequency according to Song et al by adding
         the term's count to the sum of the frequencies of all its children
@@ -72,6 +73,7 @@ def freq(uid, term_counts, term_freqs, term_trees):
         for child in get_children(uid, term_trees):
             total += freq(child, term_counts, term_freqs, term_trees)
         return total
+
 
 def get_ancestors(uid, term_trees, term_trees_rev):
     ''' Gets all the ancestors of a term
@@ -102,7 +104,7 @@ def get_ancestors(uid, term_trees, term_trees_rev):
     ancestors = list(dict.fromkeys(ancestors))
     return ancestors
 
-# Compute semantic similarity for 2 terms
+
 def semantic_similarity(uid1, uid2, sws, svs, term_trees, term_trees_rev):
     ''' Computes the semantic similarity for 2 terms
     params
@@ -115,7 +117,6 @@ def semantic_similarity(uid1, uid2, sws, svs, term_trees, term_trees_rev):
     returns
         the semantic similarity of the provided UIDs
     '''
-    logger = logging.getLogger(__name__)
 
     uid1_ancs = get_ancestors(uid1, term_trees, term_trees_rev)
     uid2_ancs = get_ancestors(uid2, term_trees, term_trees_rev)
@@ -123,9 +124,9 @@ def semantic_similarity(uid1, uid2, sws, svs, term_trees, term_trees_rev):
     num = sum([(2 * sws[term]) for term in intersection])
     denom = svs[uid1] + svs[uid2]
     
-    return 0 if num is np.NaN or denom is 0 else num / denom
+    return 0 if num is np.NaN or denom == 0 else num / denom
 
-# Get MeSH term counts
+
 def count_mesh_terms(doc_list, uids):
     ''' Counts the number of times each term is indexed to a Pubmed citation
         for a set of Pubmed documents
@@ -164,13 +165,15 @@ def count_mesh_terms(doc_list, uids):
                 # The only reason this is currently here is because it helped me
                 # find a serious issue with a package I was previously using
                 elapsed_time = int((time.perf_counter() - start_time) * 10) / 10.0
-                logger.info(f"{doc} MeSH term counts completed in {elapsed_time} seconds")
+                logger.debug(f"{doc} MeSH term counts completed in {elapsed_time} seconds")
         except Exception as e:
             trace = traceback.format_exc()
             logger.error(repr(e))
             logger.critical(trace)
     
+    logger.info(f"Counted terms for {len(doc_list)} documents")
     return term_counts
+
 
 def get_term_freqs(term_counts, term_trees, uids):
     ''' Get the term frequencies by Song et al.'s recursive definition. A
@@ -218,6 +221,7 @@ def get_term_freqs(term_counts, term_trees, uids):
 
     return term_freqs
 
+
 def output_writer(write_queue, out_path):
     ''' A multiprocessing worker, pulls from the queue and writes. The worker
         is killed if it pulls None from the queue
@@ -225,7 +229,6 @@ def output_writer(write_queue, out_path):
         write_queue - the queue to pull data from to write
         out_path - the output file path to write to
     '''
-    logger = logging.getLogger(__name__)
     with open(out_path, "w") as out:
         while True:
             result = write_queue.get()
@@ -233,8 +236,7 @@ def output_writer(write_queue, out_path):
                 break
             out.write(result)
 
-# A function for multiprocessing, the worker grabs a pair of terms from the queue
-# and then computes the semantic similarity for the pair
+
 def mp_worker(work_queue, write_queue, sws, svs, term_trees, term_trees_rev):
     ''' A multiprocessing worker. The worker grabs a pair of terms from the queue
         and then computes the semantic similarity for the pair. Worker then adds
@@ -276,7 +278,7 @@ def main():
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    handler = logging.FileHandler("compute_semantic_similarity.log")
+    handler = logging.FileHandler("semantic_similarity.log")
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -300,12 +302,13 @@ def main():
     trees = []
 
     uids, names, trees = parse_mesh(mesh_dir)
-
+    trees = [tree.split(",") for tree in trees]
+    
     # Create term_trees dict and reverse for quick and easy lookup later
     term_trees = {uids[idx]:trees[idx] for idx in range(len(uids))}
     term_trees_rev = {tree:uids[idx] for idx in range(len(uids)) for tree in trees[idx]}
 
-    # Get term counts. If recounting terms change the flags
+    # Get term counts
     term_counts = count_mesh_terms(docs, uids)
 
     # Computing aggregate information content is done in a step-by-step
@@ -403,6 +406,7 @@ def main():
     with Popen(f"rm {args.output}.*.csv", stdout=PIPE, 
                 stderr=PIPE, shell=True) as proc:
         results, errs = proc.communicate()
+
 
 if __name__ == "__main__":
     main()
