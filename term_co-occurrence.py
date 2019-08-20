@@ -9,8 +9,6 @@ import traceback
 from multiprocessing import Process, Queue
 
 import numpy as np
-# TODO: remove tqdm dependency
-from tqdm import tqdm
 
 # TODO: add docstrings
 
@@ -30,7 +28,7 @@ def count_doc_terms(doc_list, term_subset, logger):
     mesh_term_id = re.compile(r'\s*<DescriptorName UI="(D\d+)".*>')
 
     logger.info("Starting doc/term counting")
-    for doc in tqdm(doc_list):
+    for doc in doc_list:
         try:
             with open(f"./pubmed_bulk/{doc}", "r") as handle:
                 start_doc_count = len(doc_terms.keys())
