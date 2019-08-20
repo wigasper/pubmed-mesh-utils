@@ -7,11 +7,13 @@ import argparse
 import logging
 import traceback
 from multiprocessing import Process, Queue
+from subprocess import Popen, PIPE
 
 import numpy as np
 
 # TODO: add docstrings
 
+# TODO: don't need to pass logger here, add getlogger
 def count_doc_terms(doc_list, term_subset, logger):
     doc_terms = {}
     doc_pmid = ""
@@ -69,14 +71,14 @@ def count_doc_terms(doc_list, term_subset, logger):
 
     # TODO: what to do here? probably can't have this all in memory
     # maybe rm at cleanup
-    with open("./data/pm_bulk_doc_term_counts.csv", "w") as out:
+    with open("pm_bulk_doc_term_counts.csv", "w") as out:
         for doc in doc_terms:
             out.write("".join([doc, ","]))
             out.write(",".join(doc_terms[doc]))
             out.write("\n")
 
 def td_matrix_gen(file_path, term_subset, docs_per_matrix):
-    with open("./data/pm_bulk_doc_term_counts.csv", "r") as handle:
+    with open("pm_bulk_doc_term_counts.csv", "r") as handle:
         td_matrix = []
         for line in handle:
             if len(td_matrix) > docs_per_matrix:
@@ -170,7 +172,7 @@ def main():
     # Maybe need to figure out a better way to get this
     docs_per_matrix = 34
 
-    matrix_gen = td_matrix_gen("./data/pm_bulk_doc_term_counts.csv", term_subset, docs_per_matrix)
+    matrix_gen = td_matrix_gen("pm_bulk_doc_term_counts.csv", term_subset, docs_per_matrix)
 
     # TODO: add os cpu_count here to figure out num workers
     # Set up multiprocessing
@@ -242,7 +244,7 @@ def main():
             line = line.strip("\n").split("\t")
             term_counts[line[0]] = 0
 
-    with open("./data/pm_bulk_doc_term_counts.csv", "r") as handle:
+    with open("pm_bulk_doc_term_counts.csv", "r") as handle:
         for _ in range(doc_count):
             line = handle.readline()
             line = line.strip("\n").split(",")
@@ -298,6 +300,9 @@ def main():
             for col in range(row + 1, log_ratios.shape[1]):
                 if not np.isnan(log_ratios[row,col]):
                     out.write(",".join([term_subset[row], term_subset[col], str(log_ratios[row,col])]))
+    # Cleanup, remove pm_bulk_doc_term_counts.csv
+    with Popen("rm pm_bulk_doc_term_counts.csv", std=PIPE, stderr=PIPE, shell=True) as proc:
+        results, errs = proc.communicate()
 
 if __name__ == "__main__":
 	main()
