@@ -268,7 +268,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--mesh", help="Pubmed's MeSH descriptor data in XML format", 
                     required=True, type=str)
-    parser.add_argument("-i", "--input", help="A directory containing Pubmed citation XMLs",
+    parser.add_argument("-i", "--input", help="A directory containing PubMed citation XMLs",
                     required=True, type=str)
     parser.add_argument("-o", "--output", help="Output file to write data in a comma-delimited format")
     parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
