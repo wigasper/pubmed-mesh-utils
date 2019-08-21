@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import os
 import re
+import sys
 import time
 import math
 import argparse
 import logging
 import traceback
+from pathlib import Path
 from multiprocessing import Process, Queue
 from subprocess import Popen, PIPE
 
@@ -13,8 +15,8 @@ import numpy as np
 
 # TODO: add docstrings
 
-# TODO: don't need to pass logger here, add getlogger
-def count_doc_terms(doc_list, term_subset, logger):
+def count_doc_terms(doc_list, term_subset):
+    logger = logging.getLogger(__name__)
     doc_terms = {}
     doc_pmid = ""
     term_ids = []
@@ -69,8 +71,6 @@ def count_doc_terms(doc_list, term_subset, logger):
 
     logger.info("Stopping doc/term counting")
 
-    # TODO: what to do here? probably can't have this all in memory
-    # maybe rm at cleanup
     with open("pm_bulk_doc_term_counts.csv", "w") as out:
         for doc in doc_terms:
             out.write("".join([doc, ","]))
@@ -94,15 +94,8 @@ def td_matrix_gen(file_path, term_subset, docs_per_matrix):
                     row.append(0)
             td_matrix.append(row)
 
-def matrix_builder(work_queue, add_queue, id_num):
-    # TODO: remove this logger, id_num arg
-    # Set up logging - I do actually want a logger for each worker
+def matrix_builder(work_queue, add_queue):
     logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    handler = logging.FileHandler(f"./logs/term_co-occurrence_worker{id_num}.log")
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
 
     try:
         while True:
@@ -119,7 +112,8 @@ def matrix_builder(work_queue, add_queue, id_num):
         logger.critical(trace)
 
 # A function for multiprocessing, pulls from the queue and writes
-def matrix_adder(add_queue, completed_queue, dim, docs_per_matrix, num, logger):
+def matrix_adder(add_queue, completed_queue, dim, docs_per_matrix, num):
+    logger = logging.getLogger(__name__)
     # Log counts and rates after every n matrices
     log_interval = 800
     total_processed = 0
@@ -144,29 +138,38 @@ def main():
     # TODO: add args here for input, quiet mode
     # Get command line args
     parser = argparse.ArgumentParser()
-    parser.add_argument("-rc", "--recount", help="recount terms for each doc", action="store_true")
+    parser.add_argument("-i", "--input", help="A directory containing PMC full-text XMLs",
+            required=True, type=str)
     parser.add_argument("-n", "--num_docs", help="number of docs to build co-occurrence matrix with", type=int)
+    parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT" \
+            "Warning: exceptions will not be printed to console", action="store_true")
     args = parser.parse_args()
 
     # Set up logging
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    handler = logging.FileHandler("./logs/term_co-occurrence.log")
+    handler = logging.FileHandler("term_co-occurrence.log")
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
+    
+    if not args.quiet:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+ 
     # TODO: figure subset out, maybe have a function and get it as an arg
     # Load term subset to count for
     term_subset = []
     with open("./data/subset_terms_list", "r") as handle:
         for line in handle:
             term_subset.append(line.strip("\n"))
-
-    # TODO: remove this
-    if args.recount:
-        docs = os.listdir("./pubmed_bulk")
-        count_doc_terms(docs, term_subset, logger)
+    
+    docs_dir = Path(args.input).resolve()
+    docs = os.listdir(docs_dir)[:args.num_docs]
+    count_doc_terms(docs, term_subset)
 
     # This value was determined in testing but is kind of arbitrary
     # Maybe need to figure out a better way to get this
@@ -174,9 +177,8 @@ def main():
 
     matrix_gen = td_matrix_gen("pm_bulk_doc_term_counts.csv", term_subset, docs_per_matrix)
 
-    # TODO: add os cpu_count here to figure out num workers
     # Set up multiprocessing
-    num_builders = 5
+    num_builders = os.cpu_count() - 3
     num_adders = 2
     add_queue = Queue(maxsize=5)
     build_queue = Queue(maxsize=num_builders)
@@ -185,13 +187,12 @@ def main():
     logger.info(f"Starting workers on {args.num_docs} docs")
 
     adders = [Process(target=matrix_adder, args=(add_queue, completed_queue, len(term_subset), 
-                    docs_per_matrix, num, logger)) for num in range(num_adders)]
+                    docs_per_matrix, num)) for num in range(num_adders)]
     
     for adder in adders:
-        #adder.daemon = True
         adder.start()
 
-    builders = [Process(target=matrix_builder, args=(build_queue, add_queue, num)) for num in range(num_builders)]
+    builders = [Process(target=matrix_builder, args=(build_queue, add_queue)) for _ in range(num_builders)]
 
     for builder in builders:
         builder.start()
@@ -231,13 +232,11 @@ def main():
 
     co_matrix = sum(co_matrices)
     
-    # TODO: remove this, right?
-    np.save("./data/co-occurrence-matrix", co_matrix)
-
     # Compute probabilities to compare against
     term_counts = {}
 
     # TODO: get this from parse_mesh, and double check logic here
+    # TODO: or use term subset here
     # as this is pulling all UIDs and in everything else subset is used
     with open("./data/mesh_data.tab", "r") as handle:
         for line in handle:
@@ -262,19 +261,17 @@ def main():
     # Create the expected co-occurrence probability matrix
     expected = np.zeros((len(term_subset), len(term_subset)))
 
-    # TODO: change to enumerate
-    for row in range(expected.shape[0]):
-        for col in range(expected.shape[1]):
+    for row, _ in enumerate(expected.shape[0]):
+        for col, __ in enumerate(expected.shape[1]):
             expected[row, col] = term_counts[term_subset[row]] * term_counts[term_subset[col]]
 
     # Fill 0s with np.NaN to avoid zero division errors later
     expected[expected == 0] = np.NaN
 
-    # TODO: change to enumerate
     # Get the total number of co-occurrences
     total_cooccurrs = 0
-    for row in range(co_matrix.shape[0]):
-        for col in range(co_matrix.shape[1]):
+    for row, _ in enumerate(co_matrix.shape[0]):
+        for col, __ in enumerate(co_matrix.shape[1]):
             if row != col:
                 total_cooccurrs += co_matrix[row, col]
     total_cooccurrs = total_cooccurrs / 2
@@ -294,10 +291,9 @@ def main():
     # Take the log of the array to get the log-likelihood ratio
     log_ratios = np.log(likelihood_ratios)
     
-    # TODO: change to enumerate
     with open("./data/term_co-occ_log_likelihoods.csv", "w") as out:
-        for row in range(log_ratios.shape[0]):
-            for col in range(row + 1, log_ratios.shape[1]):
+        for row, _ in enumerate(log_ratios.shape[0]):
+            for col, __ in enumerate(row + 1, log_ratios.shape[1]):
                 if not np.isnan(log_ratios[row,col]):
                     out.write(",".join([term_subset[row], term_subset[col], str(log_ratios[row,col])]))
     # Cleanup, remove pm_bulk_doc_term_counts.csv
