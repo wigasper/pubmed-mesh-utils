@@ -33,3 +33,5 @@ It can be used from the command line like so:
 ```bash
 $ python3 semantic_similariy.py -i ./pubmed_xmls -m ./desc2019.xml -o semantic_similarities.csv
 ```
+
+**term_co-occurrence.py** - This is still under review and being refactored
