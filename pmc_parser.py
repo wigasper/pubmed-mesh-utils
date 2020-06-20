@@ -331,7 +331,8 @@ if __name__ == "__main__":
     parser.add_argument("-s", "--sections", help="Specify the desired sections for " \
                         "output. Sections should be follow the '-s' or '--sections' " \
                         "argument name and be space delimited, for example: " \
-                        "'-s title abstract'. Sensitive to order", nargs="*", 
+                        "'-s title abstract'. Sensitive to order. By default " \
+                        "parses titles, abstracts, and body text", nargs="*", 
                         default=["title", "abstract", "body"])
     parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
                         "Warning: exceptions will not be printed to console", 
