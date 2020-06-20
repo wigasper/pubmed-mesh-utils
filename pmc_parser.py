@@ -14,23 +14,30 @@ text_elements is a tuple of (title, abstract, body)
 '''
 def write_xml(fp, text_elements):
     with open(fp, "w") as out:
-        out.write("<title>\n")
-        out.write(text_elements["title"])
-        out.write("\n</title>\n")
+        for element in text_elements.keys():
+            out.write(f"<{element}>\n")
+            out.write(text_elements[element])
+            out.write(f"\n</{element}>\n")
 
-        out.write("<abstract>\n")
-        out.write(text_elements["abstract"])
-        out.write("\n</abstract>\n")
+        #out.write("<title>\n")
+        #out.write(text_elements["title"])
+        #out.write("\n</title>\n")
 
-        out.write("<body>\n")
-        out.write(text_elements["body"])
-        out.write("\n</body>\n")
+        #out.write("<abstract>\n")
+        #out.write(text_elements["abstract"])
+        #out.write("\n</abstract>\n")
+
+        #out.write("<body>\n")
+        #out.write(text_elements["body"])
+        #out.write("\n</body>\n")
 
 def write_json(fp, text_elements):
     pass
 
 def write_plain_text(fp, text_elements):
     pass
+    #with open(fp, "w") as out:
+        #out.write(text_elements["title"
 
 '''
 Takes an HTML entity and attempts to parse it into a UTF-8 
@@ -117,6 +124,8 @@ def parse_abstract(abstract):
 
 '''
 Parses the body section of the XML
+body should be a string, can contain tags and HTML entities
+returns a string
 '''
 def parse_body(body):
     # make one big block of text to make everything easier
@@ -148,7 +157,7 @@ def parse_body(body):
     return body
 
 '''
-Parses PMC full text XMLs
+Parses a single PMC full text XML
 '''
 def parse_xml(fp):
     logger = logging.getLogger(__name__)
@@ -210,13 +219,18 @@ def parse_xml(fp):
 
     return {"title": title, "abstract": clean_abstract, "body": clean_body}
 
-
+'''
+returns a list of absolute filepaths for every file in a directory
+'''
 def get_file_list(directory):
     absolute_path = Path(directory).resolve()
     files = os.listdir(directory)
     
-    return [os.path.join(absolute_path, f) for f in files]
+    return [os.path.join(absolute_path, f) for f in files if os.path.isfile(f)]
 
+'''
+returns a logger
+'''
 def initialize_logger(debug=False, quiet=False):
     level = logging.INFO
     if debug:
@@ -239,6 +253,9 @@ def initialize_logger(debug=False, quiet=False):
 
     return logger
 
+'''
+Maps the output format string to a function
+'''
 def output_function_map():
     function_map = {"xml": write_xml,
                     "json": write_json,
@@ -246,23 +263,24 @@ def output_function_map():
 
     return function_map
 
+'''
+Main driver function
+'''
 def parse_xmls(input_dir, output_dir, output_format, quiet, debug):
-    logger = initialize_logger(args.debug, args.quiet)
+    logger = initialize_logger(debug, quiet)
 
-    logger.info(f"Starting parser, input dir: {args.input}, output dir: {args.output}")
+    logger.info(f"Starting parser, input dir: {input_dir}, output dir: {output_dir}")
     logger.debug("Getting file list")
     
-    input_files = get_file_list(args.input)
+    input_files = get_file_list(input_dir)
 
     output_function = output_function_map()[output_format]
 
     logger.debug("Starting parse loop")
     for input_file in input_files:
-        # clean_text is a tuple (title, abs, body)
         clean_text = parse_xml(input_file)
-        pmc_id = input_file.split("/")[-1].split(".")[0]
-            
-        output_function(f"{args.output}/{pmc_id}.xml", clean_text)
+        pmc_id = input_file.split("/")[-1].split(".")[0]    
+        output_function(f"{output_dir}/{pmc_id}.xml", clean_text)
         
 
 if __name__ == "__main__":
