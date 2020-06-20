@@ -26,6 +26,12 @@ def write_xml(fp, text_elements):
         out.write(text_elements["body"])
         out.write("\n</body>\n")
 
+def write_json(fp, text_elements):
+    pass
+
+def write_plain_text(fp, text_elements):
+    pass
+
 '''
 Takes an HTML entity and attempts to parse it into a UTF-8 
 character
@@ -233,12 +239,41 @@ def initialize_logger(debug=False, quiet=False):
 
     return logger
 
+def output_function_map():
+    function_map = {"xml": write_xml,
+                    "json": write_json,
+                    "text": write_plain_text}
+
+    return function_map
+
+def parse_xmls(input_dir, output_dir, output_format, quiet, debug):
+    logger = initialize_logger(args.debug, args.quiet)
+
+    logger.info(f"Starting parser, input dir: {args.input}, output dir: {args.output}")
+    logger.debug("Getting file list")
+    
+    input_files = get_file_list(args.input)
+
+    output_function = output_function_map()[output_format]
+
+    logger.debug("Starting parse loop")
+    for input_file in input_files:
+        # clean_text is a tuple (title, abs, body)
+        clean_text = parse_xml(input_file)
+        pmc_id = input_file.split("/")[-1].split(".")[0]
+            
+        output_function(f"{args.output}/{pmc_id}.xml", clean_text)
+        
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", help="Directory containing PMC XML files",
                         required=True)
-    parser.add_argument("-o", "--output", help="Directory to write output XML files to",
+    parser.add_argument("-o", "--output", help="Directory to write output files to",
                         required=True)
+    parser.add_argument("-f", "--output-format", help="Output format, currently " \
+                        "XML, JSON, and plain text are supported and can be specified " \
+                        "using the strings 'xml', 'json', or 'text'", default="xml")
     parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
                         "Warning: exceptions will not be printed to console", 
                         action="store_true", default=False)
@@ -247,16 +282,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    logger = initialize_logger(args.debug, args.quiet)
-
-    logger.info(f"Starting parser, input dir: {args.input}, output dir: {args.output}")
-    logger.debug("Getting file list")
-    input_files = get_file_list(args.input)
-
-    logger.debug("Starting parse loop")
-    for input_file in input_files:
-        # clean_text is a tuple (title, abs, body)
-        clean_text = parse_xml(input_file)
-        pmc_id = input_file.split("/")[-1].split(".")[0]
-        write_xml(f"{args.output}/{pmc_id}.xml", clean_text)
-        
+    parse_xmls(args.input, args.output, args.output_format, args.quiet, args.debug)   
