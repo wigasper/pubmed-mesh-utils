@@ -27,6 +27,35 @@ D000002	Temefos	D02.705.400.625.800,D02.705.539.345.800,D02.886.300.692.800
 ...
 ```
 
+**pmc_parser.py** - This parses PMC full text XMLs in order to extract natural language. Currently it has only been tested and used with XMLs retrieved via the NCBI API. The primary purpose is to prep texts for natural language processing by removing all tags, HTML entities, and extraneous information.
+
+Usage:
+```bash
+usage: pmc_parser.py [-h] -i INPUT -o OUTPUT [-f OUTPUT_FORMAT]
+                     [-s [SECTIONS [SECTIONS ...]]] [-q] [-d]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        Directory containing PMC XML files
+  -o OUTPUT, --output OUTPUT
+                        Directory to write output files to
+  -f OUTPUT_FORMAT, --output-format OUTPUT_FORMAT
+                        Output format, currently XML, JSON, and plain text are
+                        supported and can be specified using the strings
+                        'xml', 'json', or 'text'
+  -s [SECTIONS [SECTIONS ...]], --sections [SECTIONS [SECTIONS ...]]
+                        Specify the desired sections for output. Sections
+                        should be follow the '-s' or '--sections' argument
+                        name and be space delimited, for example: '-s title
+                        abstract'. Sensitive to order. By default parses
+                        titles, abstracts, and body text
+  -q, --quiet           Suppress printing of log messages to STDOUT. Warning:
+                        exceptions will not be printed to console
+  -d, --debug           Set log level to DEBUG
+```
+
+
 **semantic_similarity.py** - Computes the semantic similarity of all MeSH terms by Song, Li, Srimani, Yu, and Wang's aggregate information content method detailed in the article [Measure the Semantic Similarity of GO Terms Using Aggregate Information Content](https://www.ncbi.nlm.nih.gov/pubmed/26356015). Requires the parse_mesh module, the MeSH vocabulary available from [NCBI's FTP site](ftp://nlmpubs.nlm.nih.gov/online/mesh/MESH_FILES/xmlmesh/), and documents containing PubMed citations in XML format, available from [NCBI's FTP site](https://ftp.ncbi.nlm.nih.gov/pubmed/baseline/) or by way of the [NCBI API EFetch utility](https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.EFetch). This is quite a time and memory consuming process - it computes the semantic similarity of all pair-combinations of all MeSH terms (currently 29,351) using a simple multiprocessing architecture. Currently intended to be used only from the command line. May be ported to Rust in the future.
 
 It can be used from the command line like so:
