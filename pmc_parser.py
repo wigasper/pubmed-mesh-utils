@@ -19,25 +19,13 @@ def write_xml(fp, text_elements):
             out.write(text_elements[element])
             out.write(f"\n</{element}>\n")
 
-        #out.write("<title>\n")
-        #out.write(text_elements["title"])
-        #out.write("\n</title>\n")
-
-        #out.write("<abstract>\n")
-        #out.write(text_elements["abstract"])
-        #out.write("\n</abstract>\n")
-
-        #out.write("<body>\n")
-        #out.write(text_elements["body"])
-        #out.write("\n</body>\n")
-
 def write_json(fp, text_elements):
     pass
 
 def write_plain_text(fp, text_elements):
-    pass
-    #with open(fp, "w") as out:
-        #out.write(text_elements["title"
+    with open(fp, "w") as out:
+        for element in text_elements.keys():
+            out.write(f"{text_elements[element]}\n")
 
 '''
 Takes an HTML entity and attempts to parse it into a UTF-8 
@@ -225,8 +213,9 @@ returns a list of absolute filepaths for every file in a directory
 def get_file_list(directory):
     absolute_path = Path(directory).resolve()
     files = os.listdir(directory)
-    
-    return [os.path.join(absolute_path, f) for f in files if os.path.isfile(f)]
+    absolute_fps = [os.path.join(absolute_path, f) for f in files]
+
+    return [fp for fp in absolute_fps if os.path.isfile(fp)]
 
 '''
 returns a logger
@@ -275,7 +264,7 @@ def parse_xmls(input_dir, output_dir, output_format, quiet, debug):
     input_files = get_file_list(input_dir)
 
     output_function = output_function_map()[output_format]
-
+    
     logger.debug("Starting parse loop")
     for input_file in input_files:
         clean_text = parse_xml(input_file)
