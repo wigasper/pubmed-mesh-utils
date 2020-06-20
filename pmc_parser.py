@@ -15,15 +15,15 @@ text_elements is a tuple of (title, abstract, body)
 def write_xml(fp, text_elements):
     with open(fp, "w") as out:
         out.write("<title>\n")
-        out.write(text_elements[0])
+        out.write(text_elements["title"])
         out.write("\n</title>\n")
 
         out.write("<abstract>\n")
-        out.write(text_elements[1])
+        out.write(text_elements["abstract"])
         out.write("\n</abstract>\n")
 
         out.write("<body>\n")
-        out.write(text_elements[2])
+        out.write(text_elements["body"])
         out.write("\n</body>\n")
 
 '''
@@ -202,7 +202,7 @@ def parse_xml(fp):
     title = remove_codes(title)
     title = remove_tags(title)
 
-    return (title, clean_abstract, clean_body)
+    return {"title": title, "abstract": clean_abstract, "body": clean_body}
 
 
 def get_file_list(directory):
