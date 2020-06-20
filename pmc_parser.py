@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import html
+import json
 import argparse
 import logging
 import unicodedata
@@ -10,22 +11,33 @@ import traceback
 from pathlib import Path
 
 '''
-text_elements is a tuple of (title, abstract, body)
+text_elements is a dict containing text elements like
+title, abstract, and body. Writes output in an XML-like format
 '''
 def write_xml(fp, text_elements):
-    with open(fp, "w") as out:
+    with open(f"{fp}.xml", "w") as out:
         for element in text_elements.keys():
             out.write(f"<{element}>\n")
             out.write(text_elements[element])
             out.write(f"\n</{element}>\n")
 
+'''
+text_elements is a dict containing text elements like 
+title, abstract, and body. Writes output in JSON
+'''
 def write_json(fp, text_elements):
-    pass
+    with open(f"{fp}.json", "w") as out:
+        json.dump(text_elements, out)
 
+'''
+text_elements is a dict containing text elements like
+title, abstract, and body. Writes output in a plain text
+format
+'''
 def write_plain_text(fp, text_elements):
-    with open(fp, "w") as out:
+    with open(f"{fp}.txt", "w") as out:
         for element in text_elements.keys():
-            out.write(f"{text_elements[element]}\n")
+            out.write(f"{element.upper()}: {text_elements[element]}\n")
 
 '''
 Takes an HTML entity and attempts to parse it into a UTF-8 
@@ -243,35 +255,70 @@ def initialize_logger(debug=False, quiet=False):
     return logger
 
 '''
+Validates the section names requested in the input
+'''
+def validate_sections(sections_in):
+    logger = logging.getLogger(__name__)
+
+    valid_sections = ["title", "abstract", "body"]
+    sections = [sec for sec in sections_in if sec in valid_sections]
+    
+    if len(sections) == 0:
+        raise ValueError("No valid text sections were passed")
+
+    if len(sections_in) > len(sections):
+        excluded = [sec for sec in sections_in if sec not in sections]
+        logger.info(f"The following sections are not valid: {excluded}")
+
+    return sections
+
+'''
 Maps the output format string to a function
 '''
-def output_function_map():
+def get_output_function(output_format):
+    logger = logging.getLogger(__name__)
+
     function_map = {"xml": write_xml,
                     "json": write_json,
                     "text": write_plain_text}
 
-    return function_map
+    if output_format not in function_map.keys():
+        logger.warning("Requested output format not supported, defaulting to XML")
+        output_format = "xml"
+
+    return function_map[output_format]
 
 '''
 Main driver function
 '''
-def parse_xmls(input_dir, output_dir, output_format, quiet, debug):
+def parse_xmls(input_dir, output_dir, output_format="xml", 
+        sections=["title", "abstract", "body"], quiet=False, debug=False):
     logger = initialize_logger(debug, quiet)
+
+    sections = validate_sections(sections)
+    
 
     logger.info(f"Starting parser, input dir: {input_dir}, output dir: {output_dir}")
     logger.debug("Getting file list")
     
     input_files = get_file_list(input_dir)
 
-    output_function = output_function_map()[output_format]
+    output_function = get_output_function(output_format)
     
     logger.debug("Starting parse loop")
     for input_file in input_files:
-        clean_text = parse_xml(input_file)
-        pmc_id = input_file.split("/")[-1].split(".")[0]    
-        output_function(f"{output_dir}/{pmc_id}.xml", clean_text)
+        clean_text_temp = parse_xml(input_file)
         
+        clean_text = {}
+        for section in sections:
+            clean_text[section] = clean_text_temp[section]
 
+        pmc_id = input_file.split("/")[-1].split(".")[0]    
+        output_function(f"{output_dir}/{pmc_id}", clean_text)
+        
+'''
+For command line usage
+'''
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", help="Directory containing PMC XML files",
@@ -281,6 +328,11 @@ if __name__ == "__main__":
     parser.add_argument("-f", "--output-format", help="Output format, currently " \
                         "XML, JSON, and plain text are supported and can be specified " \
                         "using the strings 'xml', 'json', or 'text'", default="xml")
+    parser.add_argument("-s", "--sections", help="Specify the desired sections for " \
+                        "output. Sections should be follow the '-s' or '--sections' " \
+                        "argument name and be space delimited, for example: " \
+                        "'-s title abstract'. Sensitive to order", nargs="*", 
+                        default=["title", "abstract", "body"])
     parser.add_argument("-q", "--quiet", help="Suppress printing of log messages to STDOUT. " \
                         "Warning: exceptions will not be printed to console", 
                         action="store_true", default=False)
@@ -288,5 +340,6 @@ if __name__ == "__main__":
                         default=False)
 
     args = parser.parse_args()
-
-    parse_xmls(args.input, args.output, args.output_format, args.quiet, args.debug)   
+    
+    parse_xmls(args.input, args.output, args.output_format, args.sections, 
+                args.quiet, args.debug)   
