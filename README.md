@@ -30,7 +30,7 @@ D000002	Temefos	D02.705.400.625.800,D02.705.539.345.800,D02.886.300.692.800
 **pmc_parser.py** - This parses PMC full text XMLs in order to extract natural language. Currently it has only been tested and used with XMLs retrieved via the NCBI API. The primary purpose is to prep texts for natural language processing by removing all tags, HTML entities, and extraneous information.
 
 Usage:
-```bash
+```
 usage: pmc_parser.py [-h] -i INPUT -o OUTPUT [-f OUTPUT_FORMAT]
                      [-s [SECTIONS [SECTIONS ...]]] [-q] [-d]
 
