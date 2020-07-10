@@ -5,9 +5,10 @@ import argparse
 import logging
 
 def parse_mesh(descriptor_file):
+    allow_permuted_terms = False
+
+    desc_data = {}
     desc_uis = []
-    desc_names = []
-    tree_num_lists = []
 
     desc_name_tag = re.compile(r"\s+</DescriptorName>")
     desc_rec_end_tag = re.compile(r"\s*</DescriptorRecord>")
@@ -15,13 +16,23 @@ def parse_mesh(descriptor_file):
     desc_ui = re.compile(r"<DescriptorUI>(D\d+)</DescriptorUI")
     desc_name = re.compile(r"<String>(.+)</String>")
     tree_num = re.compile(r"<TreeNumber>(.+)</TreeNumber")
+    
+    concept_list_start = re.compile(r"\s*<ConceptList")
+    concept_list_end = re.compile(r"\s*</ConceptList")
+    
+    term_entry_start = re.compile(r"\s*<Term\s+")
+    term_entry_end = re.compile(r"\s*</Term>")
+    term_string = re.compile(r"\s*<String>(.*)</String")
+    term_permute_status = re.compile(r'\s*<Term.*IsPermutedTermYN="([YN])".*')
 
     with open(descriptor_file, "r") as handle:
         line = handle.readline()
         while line:
             if line.startswith("<DescriptorRecord "):
                 tree_nums = []
+                entry_terms = []
                 relevant_lines = []
+                permute_status = None
 
                 while not desc_name_tag.search(line) and not line.startswith("</DescriptorRecord"):
                     relevant_lines.append(line.strip("\n"))
@@ -36,16 +47,42 @@ def parse_mesh(descriptor_file):
                     tree_match = tree_num.search(line)
                     if tree_match:
                         tree_nums.append(tree_match.group(1))
+                    
+                    if concept_list_start.search(line):
+                        while not concept_list_end.search(line):
+                            if term_entry_start.search(line):
+                                if not permute_status:
+                                    permute_status_search = term_permute_status.search(line)
+                                    if permute_status_search:
+                                        try:
+                                            
+                                            permute_status = permute_status_search.group(1)
+                                        except:
+                                            print("bad")
+                                            print(line)
+                                        if allow_permuted_terms == False:
+                                            if permute_status == "Y":
+                                                permute_agreement = False
+                                        else:
+                                            permute_agreement = True
+
+                                while not term_entry_end.search(line):
+                                    term_string_match = term_string.search(line)
+                                    if term_string_match and permute_agreement:
+                                        entry_terms.append(term_string_match.group(1))
+                                    line = handle.readline()
+                            line = handle.readline()
                     line = handle.readline()
-                
+                    
                 if ui_match and name_match:
+                    desc_data[ui_match.group(1)] = {"name": name_match.group(1),
+                                                    "graph_positions": "|".join(tree_nums),
+                                                    "entry_terms": "|".join(entry_terms)}
                     desc_uis.append(ui_match.group(1))
-                    desc_names.append(name_match.group(1))
-                    tree_num_lists.append(",".join(tree_nums))
 
             line = handle.readline()
 
-    return desc_uis, desc_names, tree_num_lists
+    return (desc_data, desc_uis)
 
 def main():
     # Get command line args
@@ -64,21 +101,22 @@ def main():
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
-    uis, names, trees = parse_mesh(args.input)
+    
+    fields = ["name", "entry_terms", "graph_positions"]
+    
+    # desc_uis keeps terms in the same order as the original file but
+    # maybe this is not really necessary
+    (desc_data, desc_uis) = parse_mesh(args.input)
 
     if args.output:
         with open(args.output, "w") as out:
-            for idx, ui in enumerate(uis):
-                out.write("".join([ui, "\t", names[idx], "\t", trees[idx], "\n"]))
-    """
-    if verbose:
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    """
+            for ui in desc_uis:
+                line = [ui]
+                for field in fields:
+                    line.append(desc_data[ui][field])
+                
+                out.write("\t".join(line))
+                out.write("\n")
 
 if __name__ == "__main__":
     main()
