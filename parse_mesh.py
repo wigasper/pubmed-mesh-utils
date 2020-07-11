@@ -32,7 +32,6 @@ def parse_mesh(descriptor_file):
                 tree_nums = []
                 entry_terms = []
                 relevant_lines = []
-                permute_status = None
 
                 while not desc_name_tag.search(line) and not line.startswith("</DescriptorRecord"):
                     relevant_lines.append(line.strip("\n"))
@@ -51,18 +50,17 @@ def parse_mesh(descriptor_file):
                     if concept_list_start.search(line):
                         while not concept_list_end.search(line):
                             if term_entry_start.search(line):
+                                permute_status = None
+                                permute_agreement = False
+
                                 if not permute_status:
                                     permute_status_search = term_permute_status.search(line)
                                     if permute_status_search:
-                                        try:
-                                            
-                                            permute_status = permute_status_search.group(1)
-                                        except:
-                                            print("bad")
-                                            print(line)
+                                        permute_status = permute_status_search.group(1)
+                                        
                                         if allow_permuted_terms == False:
-                                            if permute_status == "Y":
-                                                permute_agreement = False
+                                            if permute_status == "N":
+                                                permute_agreement = True
                                         else:
                                             permute_agreement = True
 
@@ -75,6 +73,7 @@ def parse_mesh(descriptor_file):
                     line = handle.readline()
                     
                 if ui_match and name_match:
+                    entry_terms = [t for t in entry_terms if t != name_match.group(1)]
                     desc_data[ui_match.group(1)] = {"name": name_match.group(1),
                                                     "graph_positions": "|".join(tree_nums),
                                                     "entry_terms": "|".join(entry_terms)}
